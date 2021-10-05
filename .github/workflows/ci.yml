@@ -24,14 +24,14 @@ jobs:
       run: |
         curl -sL https://civo.com/get | sh
         civo version
-        civo apikey add github_actions_key ${{ secrets.CIVO_API_KEY }}
+        civo apikey save github_actions_key ${{ secrets.CIVO_API_KEY }}
         civo apikey current github_actions_key
 
     - name: Setup configuration
       run: |
         echo ${{ secrets.ENV_FILE_BASE64 }} | base64 -d > ./app.env
         # Downloading cluster configuration
-        civo kubernetes config HmCluster --save --merge
+        civo kube config ${{ secrets.CLUSTER_NAME }} --save --overwrite --region FRA1
 
     - name: Cache Docker layers
       uses: actions/cache@v2
@@ -63,10 +63,11 @@ jobs:
 
     - name: Deploy to CIVO
       run: |
-        NAMESPACE="fiber-pscale-development"
+        APP_NAME="fiber-pscale"
+        NAMESPACE="fiber-pscale"
 
         sed -i "/namespace-name/c\\  name: ${NAMESPACE}" devops/namespace.yaml
-        kubectl apply -f ./devops/kubectl-namespace.yaml
+        kubectl apply -f ./devops/namespace.yaml
 
         # Encode the config in base64 and set it as an environment variable
         # then decode it to use for the build
@@ -77,4 +78,23 @@ jobs:
           kubectl create configmap env --from-file=app.env -o yaml --dry-run=client -n ${NAMESPACE} | kubectl replace -f - -n ${NAMESPACE}
         else
           kubectl create configmap env --from-file=app.env -n ${NAMESPACE}
+        fi
+
+        # Create deployment
+        kubectl apply -f ./devops/deployment.yaml -n ${NAMESPACE}
+
+        # Create service
+        kubectl apply -f ./devops/service.yaml -n ${NAMESPACE}
+
+        # Create ingress
+        kubectl apply -f ./devops/ingress.yaml -n ${NAMESPACE}
+
+        # Restart deployment
+        kubectl rollout restart deployment ${APP_NAME} -n ${NAMESPACE}
+
+        # Rollback if deployment fails
+        if ! kubectl rollout status deployment --timeout 3m ${APP_NAME} -n ${NAMESPACE}; then
+          echo "App deployment failed, rolling back to previous deployment..."
+          kubectl rollout undo deployment ${APP_NAME} -n ${NAMESPACE}
+          exit 1
         fi

@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: fiber-pscale.bocahdesa.com
+spec:
+  secretName: fiber-pscale.bocahdesa.com-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: Issuer
+  commonName: fiber-pscale.bocahdesa.com
+  dnsNames:
+  - fiber-pscale.bocahdesa.com

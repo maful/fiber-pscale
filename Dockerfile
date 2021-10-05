@@ -1,14 +1,15 @@
-# Build stage
-FROM golang:1.17-alpine3.14 AS builder
+FROM golang:1.17 AS builder
 RUN mkdir /app
+COPY go.mod /app
+COPY go.sum /app
 WORKDIR /app
-COPY go.mod go.sum ./
 RUN go mod download
-COPY . ./
-RUN go build -o main ./cmd/main.go
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o mainapp ./cmd/main.go
 
-# Run stage
-FROM alpine:3.14
-COPY --from=builder /app .
+FROM alpine:3.14.2
+RUN apk add --no-cache ca-certificates && update-ca-certificates
+WORKDIR /app
+COPY --from=builder /app/mainapp .
 EXPOSE 3000
-CMD ["./main"]
+CMD ["./mainapp"]

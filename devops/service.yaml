@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: fiber-pscale-service
+  labels:
+    app: fiber-pscale
+spec:
+  ports:
+  - protocol: TCP
+    targetPort: 3000
+    port: 3000
+  selector:
+    app: fiber-pscale
