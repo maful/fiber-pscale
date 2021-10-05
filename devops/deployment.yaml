@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fiber-pscale
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fiber-pscale
+  template:
+    metadata:
+      labels:
+        app: fiber-pscale
+    spec:
+      containers:
+        - image: makefeelbetter/fiber-pscale:latest
+          name: fiber-pscale
+          ports:
+          - containerPort: 3000
+            protocol: TCP
+          volumeMounts:
+          - name: fiber-pscale-env
+            mountPath: "/app/app.env"
+            subPath: "app.env"
+      priorityClassName: default
+      volumes:
+      - name: fiber-pscale-env
+        configMap:
+          name: env

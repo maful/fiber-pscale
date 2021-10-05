@@ -16,7 +16,8 @@ jobs:
     - name: Setup Docker Buildx
       uses: docker/setup-buildx-action@v1
 
-    - uses: azure/setup-kubectl@v1
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v1
       id: install
 
     - name: Install Civo CLI
@@ -29,6 +30,8 @@ jobs:
     - name: Setup configuration
       run: |
         echo ${{ secrets.ENV_FILE_BASE64 }} | base64 -d > ./app.env
+        # Downloading cluster configuration
+        civo kubernetes config HmCluster --save --merge
 
     - name: Cache Docker layers
       uses: actions/cache@v2
@@ -57,3 +60,21 @@ jobs:
 
     - name: Image digest
       run: echo ${{ steps.docker_build.outputs.digest }}
+
+    - name: Deploy to CIVO
+      run: |
+        NAMESPACE="fiber-pscale-development"
+
+        sed -i "/namespace-name/c\\  name: ${NAMESPACE}" devops/namespace.yaml
+        kubectl apply -f ./devops/kubectl-namespace.yaml
+
+        # Encode the config in base64 and set it as an environment variable
+        # then decode it to use for the build
+        echo ${{ secrets.ENV_FILE_BASE64 }} | base64 -d > ./app.env
+
+        # Update configmap if it exists, create one if it does not
+        if [[ $(kubectl get configmap env -n ${NAMESPACE} --ignore-not-found | wc -c) -ne 0 ]]; then
+          kubectl create configmap env --from-file=app.env -o yaml --dry-run=client -n ${NAMESPACE} | kubectl replace -f - -n ${NAMESPACE}
+        else
+          kubectl create configmap env --from-file=app.env -n ${NAMESPACE}
+        fi
